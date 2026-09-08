@@ -212,18 +212,26 @@ create index categories_parent_id_status_sort_order_idx
   on public.categories (parent_id, status, sort_order);
 create unique index categories_slug_lower_key
   on public.categories (lower(slug));
+create index categories_slug_idx
+  on public.categories (slug);
 create index collections_status_sort_order_idx
   on public.collections (status, sort_order);
 create unique index collections_slug_lower_key
   on public.collections (lower(slug));
+create index collections_slug_idx
+  on public.collections (slug);
 create index products_status_featured_created_at_idx
   on public.products (status, is_featured, created_at desc);
 create unique index products_slug_lower_key
   on public.products (lower(slug));
+create index products_slug_idx
+  on public.products (slug);
 create index product_variants_product_id_status_idx
   on public.product_variants (product_id, status);
 create unique index product_variants_sku_lower_key
   on public.product_variants (lower(sku));
+create index product_variants_sku_idx
+  on public.product_variants (sku);
 create index product_images_product_id_sort_order_idx
   on public.product_images (product_id, sort_order);
 create unique index product_images_primary_per_product_idx
@@ -241,6 +249,7 @@ create index homepage_sections_published_idx
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
+security definer
 set search_path = ''
 as $$
 begin
@@ -262,6 +271,22 @@ as $$
     where id = auth.uid()
       and is_active = true
       and role in ('staff', 'admin')
+  );
+$$;
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and is_active = true
+      and role = 'admin'
   );
 $$;
 
@@ -348,6 +373,7 @@ $$;
 create or replace function public.ensure_new_variant_starts_without_stock()
 returns trigger
 language plpgsql
+security definer
 set search_path = ''
 as $$
 begin
@@ -362,6 +388,7 @@ $$;
 create or replace function public.ensure_active_product_has_variant()
 returns trigger
 language plpgsql
+security definer
 set search_path = ''
 as $$
 begin
@@ -381,6 +408,7 @@ $$;
 create or replace function public.prevent_removing_final_active_variant()
 returns trigger
 language plpgsql
+security definer
 set search_path = ''
 as $$
 declare
@@ -421,6 +449,7 @@ $$;
 create or replace function public.prevent_variant_product_reassignment()
 returns trigger
 language plpgsql
+security definer
 set search_path = ''
 as $$
 begin
@@ -435,6 +464,7 @@ $$;
 create or replace function public.prevent_deleting_used_variant()
 returns trigger
 language plpgsql
+security definer
 set search_path = ''
 as $$
 begin
@@ -453,6 +483,7 @@ $$;
 create or replace function public.prevent_category_cycle()
 returns trigger
 language plpgsql
+security definer
 set search_path = ''
 as $$
 begin
@@ -483,6 +514,44 @@ begin
 end;
 $$;
 
+create or replace function public.enforce_customer_fields_protection()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_staff() then
+    if tg_op = 'INSERT' then
+      if new.total_orders <> 0 then
+        raise exception 'total_orders cannot be initialized by customer';
+      end if;
+      if new.total_spent_paise <> 0 then
+        raise exception 'total_spent_paise cannot be initialized by customer';
+      end if;
+      if new.notes is not null then
+        raise exception 'notes cannot be initialized by customer';
+      end if;
+    elsif tg_op = 'UPDATE' then
+      if new.auth_user_id is distinct from old.auth_user_id then
+        raise exception 'auth_user_id cannot be changed';
+      end if;
+      if new.total_orders is distinct from old.total_orders then
+        raise exception 'total_orders cannot be modified by customer';
+      end if;
+      if new.total_spent_paise is distinct from old.total_spent_paise then
+        raise exception 'total_spent_paise cannot be modified by customer';
+      end if;
+      if new.notes is distinct from old.notes then
+        raise exception 'notes cannot be modified by customer';
+      end if;
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
 -- Views use explicit filters because their owner can read the protected base tables.
 -- The public view intentionally excludes cost, stock, barcode, and other internal fields.
 create view public.catalog_product_variants
@@ -497,6 +566,7 @@ select
   variant.price_paise,
   variant.compare_at_price_paise,
   variant.status,
+  (not variant.track_inventory or variant.allow_backorder or variant.stock_on_hand > 0) as is_in_stock,
   variant.created_at,
   variant.updated_at
 from public.product_variants as variant
@@ -525,6 +595,10 @@ for each row execute function public.set_updated_at();
 create trigger customers_set_updated_at
 before update on public.customers
 for each row execute function public.set_updated_at();
+
+create trigger customers_enforce_fields_protection
+before insert or update on public.customers
+for each row execute function public.enforce_customer_fields_protection();
 
 create trigger customer_addresses_set_updated_at
 before update on public.customer_addresses
@@ -566,8 +640,9 @@ create trigger homepage_sections_set_updated_at
 before update on public.homepage_sections
 for each row execute function public.set_updated_at();
 
-create trigger products_require_active_variant
-before insert or update of status on public.products
+create constraint trigger products_require_active_variant
+after insert or update of status on public.products
+deferrable initially deferred
 for each row execute function public.ensure_active_product_has_variant();
 
 create trigger product_variants_require_active_variant
@@ -601,16 +676,17 @@ revoke all on table public.profiles, public.customers, public.customer_addresses
   public.inventory_movements, public.homepage_sections from anon, authenticated;
 
 grant usage on schema public to anon, authenticated;
-revoke all on function public.set_updated_at(), public.is_staff(),
+revoke all on function public.set_updated_at(), public.is_staff(), public.is_admin(),
   public.owns_customer(uuid), public.bootstrap_first_admin(uuid),
   public.apply_inventory_movement(),
   public.ensure_new_variant_starts_without_stock(),
   public.ensure_active_product_has_variant(),
   public.prevent_removing_final_active_variant(),
   public.prevent_variant_product_reassignment(),
-  public.prevent_deleting_used_variant(), public.prevent_category_cycle()
+  public.prevent_deleting_used_variant(), public.prevent_category_cycle(),
+  public.enforce_customer_fields_protection()
   from public;
-grant execute on function public.is_staff() to authenticated;
+grant execute on function public.is_staff(), public.is_admin() to authenticated;
 grant execute on function public.owns_customer(uuid) to authenticated;
 
 grant select on public.categories, public.collections, public.products,
@@ -619,26 +695,20 @@ grant select on public.categories, public.collections, public.products,
 grant select on public.catalog_product_variants to anon, authenticated;
 grant select on public.admin_product_variants, public.admin_customers to authenticated;
 grant select, insert, update, delete on public.customer_addresses to authenticated;
-grant select, insert, update on public.profiles to authenticated;
-grant select (id, auth_user_id, email, phone, first_name, last_name,
-  marketing_opt_in, created_at, updated_at) on public.customers to authenticated;
-grant insert (auth_user_id, email, phone, first_name, last_name, marketing_opt_in)
-  on public.customers to authenticated;
-grant update (email, phone, first_name, last_name, marketing_opt_in)
-  on public.customers to authenticated;
+grant select, insert, update, delete on public.profiles to authenticated;
+grant select, insert, update, delete on public.customers to authenticated;
 grant select, insert, update, delete on public.categories, public.collections,
   public.products, public.product_images,
   public.product_categories, public.product_collections, public.homepage_sections
   to authenticated;
-grant insert (product_id, sku, barcode, title, attributes, price_paise,
+grant select, delete on public.product_variants to authenticated;
+grant insert (id, product_id, sku, barcode, title, attributes, price_paise,
   compare_at_price_paise, cost_paise, weight_grams, track_inventory,
   allow_backorder, low_stock_threshold, status) on public.product_variants
   to authenticated;
-grant select (id) on public.product_variants to authenticated;
 grant update (sku, barcode, title, attributes, price_paise, compare_at_price_paise,
   cost_paise, weight_grams, track_inventory, allow_backorder,
   low_stock_threshold, status) on public.product_variants to authenticated;
-grant delete on public.product_variants to authenticated;
 grant select, insert on public.inventory_movements to authenticated;
 
 create policy "profiles: users read their own profile"
@@ -654,10 +724,14 @@ on public.profiles for update to authenticated
 using (id = auth.uid() and role = 'customer')
 with check (id = auth.uid() and role = 'customer');
 
-create policy "profiles: staff manage all profiles"
+create policy "profiles: staff view all profiles"
+on public.profiles for select to authenticated
+using ((select public.is_staff()));
+
+create policy "profiles: admin manage all profiles"
 on public.profiles for all to authenticated
-using ((select public.is_staff()))
-with check ((select public.is_staff()));
+using ((select public.is_admin()))
+with check ((select public.is_admin()));
 
 create policy "customers: users read their customer record"
 on public.customers for select to authenticated
