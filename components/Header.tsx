@@ -17,7 +17,7 @@ export default function Header() {
           <a href="#" className="flex items-center">
             <Image
               src={assets.images.logo}
-              alt="PNT Collections Logo"
+              alt="PNT Creation Logo"
               width={120}
               height={60}
               priority

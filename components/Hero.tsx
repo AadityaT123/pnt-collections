@@ -8,7 +8,7 @@ export default function Hero() {
       {/* Full-width Hero Image */}
       <Image
         src={assets.images.hero.main}
-        alt="Teal saree from PNT Collections"
+        alt="Teal saree from PNT Creation"
         fill
         priority
         sizes="100vw"

@@ -82,11 +82,11 @@ function LoginForm() {
     <div className="w-full max-w-md">
       {/* Brand Header */}
       <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-[#1C1613] border border-[#3D2F28] shadow-xl mb-4">
+        <div className="inline-flex items-center justify-center p-3.5 rounded-2xl bg-[#FFFFFF] border border-[#D6B978]/50 shadow-lg mb-4">
           <div className="relative w-12 h-12">
             <Image
               src={assets.images.logo}
-              alt="PNT Collections"
+              alt="PNT Creation"
               fill
               sizes="48px"
               className="object-contain"
@@ -94,22 +94,22 @@ function LoginForm() {
             />
           </div>
         </div>
-        <h1 className="text-2xl font-serif font-medium tracking-wide text-[#F8F1E7]">
-          PNT Collections
+        <h1 className="text-2xl font-serif font-bold tracking-wide text-[#641C24]">
+          PNT Creation
         </h1>
-        <p className="text-xs uppercase tracking-widest text-[#C5A880] mt-1 font-medium">
+        <p className="text-xs uppercase tracking-widest text-[#B58A45] mt-1 font-semibold">
           Admin Portal Authentication
         </p>
       </div>
 
       {/* Login Card */}
-      <div className="bg-[#1C1613] border border-[#3D2F28] rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
+      <div className="bg-[#FFFFFF] border border-[#D6B978]/40 rounded-2xl p-8 shadow-xl">
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Error Message */}
           {errorMessage && (
-            <div className="p-3.5 rounded-lg bg-red-950/40 border border-red-800/60 text-red-200 text-xs flex items-start gap-2.5">
+            <div className="p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs flex items-start gap-2.5">
               <svg
-                className="w-4 h-4 text-red-400 shrink-0 mt-0.5"
+                className="w-4 h-4 text-red-600 shrink-0 mt-0.5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -129,7 +129,7 @@ function LoginForm() {
           <div>
             <label
               htmlFor="admin-email"
-              className="block text-xs font-medium text-[#E8D8C8] uppercase tracking-wider mb-2"
+              className="block text-xs font-semibold text-[#2B211C] uppercase tracking-wider mb-2"
             >
               Admin Email
             </label>
@@ -143,7 +143,7 @@ function LoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@pntcollections.com"
                 disabled={isLoading}
-                className="w-full px-3.5 py-2.5 bg-[#2B211C] border border-[#4A3B32] rounded-lg text-sm text-[#F8F1E7] placeholder-[#786154] focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-colors disabled:opacity-50"
+                className="w-full px-3.5 py-2.5 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-sm text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24] focus:ring-1 focus:ring-[#641C24] transition-colors disabled:opacity-50"
               />
             </div>
           </div>
@@ -152,7 +152,7 @@ function LoginForm() {
           <div>
             <label
               htmlFor="admin-password"
-              className="block text-xs font-medium text-[#E8D8C8] uppercase tracking-wider mb-2"
+              className="block text-xs font-semibold text-[#2B211C] uppercase tracking-wider mb-2"
             >
               Password
             </label>
@@ -166,7 +166,7 @@ function LoginForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
                 disabled={isLoading}
-                className="w-full px-3.5 py-2.5 bg-[#2B211C] border border-[#4A3B32] rounded-lg text-sm text-[#F8F1E7] placeholder-[#786154] focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-colors disabled:opacity-50"
+                className="w-full px-3.5 py-2.5 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-sm text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24] focus:ring-1 focus:ring-[#641C24] transition-colors disabled:opacity-50"
               />
             </div>
           </div>
@@ -175,12 +175,12 @@ function LoginForm() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2.5 px-4 bg-gradient-to-r from-[#C5A880] to-[#E8D8C8] hover:from-[#B8986C] hover:to-[#D8C4B0] text-[#1C1613] text-sm font-semibold rounded-lg shadow-md transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+            className="w-full py-2.5 px-4 bg-[#641C24] hover:bg-[#4A141B] text-white text-sm font-semibold rounded-lg shadow-md transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           >
             {isLoading ? (
               <>
                 <svg
-                  className="animate-spin h-4 w-4 text-[#1C1613]"
+                  className="animate-spin h-4 w-4 text-white"
                   fill="none"
                   viewBox="0 0 24 24"
                 >
@@ -206,15 +206,15 @@ function LoginForm() {
           </button>
         </form>
 
-        <div className="mt-6 pt-5 border-t border-[#3D2F28] flex items-center justify-between text-xs text-[#A68A78]">
+        <div className="mt-6 pt-5 border-t border-[#D6B978]/30 flex items-center justify-between text-xs text-[#7A5A45]">
           <span>Protected Administrative Zone</span>
           <Link
             href="/"
-            className="hover:text-amber-300 transition-colors inline-flex items-center gap-1"
+            className="text-[#641C24] hover:text-[#4A141B] font-medium transition-colors inline-flex items-center gap-1"
           >
             <span>Return to Store</span>
             <svg
-              className="w-3 h-3"
+              className="w-3 h-3 text-[#B58A45]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -235,10 +235,10 @@ function LoginForm() {
 
 export default function AdminLoginPage() {
   return (
-    <div className="min-h-screen bg-[#140F0D] text-[#F8F1E7] flex flex-col items-center justify-center p-4 selection:bg-amber-500/30">
+    <div className="min-h-screen bg-[#F8F1E7] text-[#2B211C] flex flex-col items-center justify-center p-4 selection:bg-[#B58A45]/20 selection:text-[#2B211C]">
       <Suspense
         fallback={
-          <div className="w-full max-w-md p-8 text-center text-[#A68A78] text-sm">
+          <div className="w-full max-w-md p-8 text-center text-[#7A5A45] text-sm">
             Loading authentication portal...
           </div>
         }

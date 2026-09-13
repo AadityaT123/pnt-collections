@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { assets } from '@/lib/assets'
 
@@ -15,6 +15,7 @@ interface AdminHeaderProps {
 
 export default function AdminHeader({ adminEmail, adminName, role = 'admin' }: AdminHeaderProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const [isSigningOut, setIsSigningOut] = useState(false)
 
   async function handleSignOut() {
@@ -30,16 +31,19 @@ export default function AdminHeader({ adminEmail, adminName, role = 'admin' }: A
     }
   }
 
+  const isDashboardActive = pathname === '/admin'
+  const isProductsActive = pathname.startsWith('/admin/products')
+
   return (
-    <header className="sticky top-0 z-50 bg-[#1C1613] text-[#F8F1E7] border-b border-[#3D2F28] shadow-md">
+    <header className="sticky top-0 z-50 bg-[#FFFFFF] text-[#2B211C] border-b border-[#D6B978]/40 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand & Portal Identity */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6">
           <Link href="/admin" className="flex items-center gap-3 group">
-            <div className="relative w-8 h-8 rounded bg-[#2B211C] p-1 border border-[#4A3B32]">
+            <div className="relative w-8 h-8 rounded bg-[#F8F1E7] p-1 border border-[#D6B978]/50">
               <Image
                 src={assets.images.logo}
-                alt="PNT Collections"
+                alt="PNT Creation"
                 fill
                 sizes="32px"
                 className="object-contain"
@@ -47,20 +51,44 @@ export default function AdminHeader({ adminEmail, adminName, role = 'admin' }: A
               />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-semibold tracking-wider text-[#E8D8C8] uppercase group-hover:text-amber-300 transition-colors">
-                PNT Collections
+              <span className="text-sm font-serif font-bold tracking-wider text-[#2B211C] uppercase group-hover:text-[#641C24] transition-colors">
+                PNT Creation
               </span>
-              <span className="text-[10px] text-[#A68A78] tracking-widest uppercase">
+              <span className="text-[10px] text-[#B58A45] tracking-widest uppercase font-medium">
                 Admin Console
               </span>
             </div>
           </Link>
 
-          <div className="hidden sm:flex items-center gap-2 pl-4 border-l border-[#3D2F28]">
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
+          <div className="hidden sm:flex items-center gap-2 pl-4 border-l border-[#D6B978]/40">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-[#EFE2D0] text-[#641C24] border border-[#D6B978]/60 uppercase tracking-wider">
               {role}
             </span>
           </div>
+
+          {/* Navigation Items */}
+          <nav className="hidden md:flex items-center gap-1.5 pl-4 border-l border-[#D6B978]/40">
+            <Link
+              href="/admin"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                isDashboardActive
+                  ? 'bg-[#641C24] text-white shadow-xs font-semibold'
+                  : 'text-[#7A5A45] hover:text-[#2B211C] hover:bg-[#F8F1E7]'
+              }`}
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/admin/products"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                isProductsActive
+                  ? 'bg-[#641C24] text-white shadow-xs font-semibold'
+                  : 'text-[#7A5A45] hover:text-[#2B211C] hover:bg-[#F8F1E7]'
+              }`}
+            >
+              Products
+            </Link>
+          </nav>
         </div>
 
         {/* User Status & Actions */}
@@ -69,11 +97,11 @@ export default function AdminHeader({ adminEmail, adminName, role = 'admin' }: A
           <Link
             href="/"
             target="_blank"
-            className="hidden md:inline-flex items-center gap-1.5 text-xs text-[#C5A880] hover:text-[#E8D8C8] transition-colors py-1.5 px-2.5 rounded hover:bg-[#2B211C]"
+            className="hidden md:inline-flex items-center gap-1.5 text-xs text-[#641C24] hover:text-[#4A141B] font-medium transition-colors py-1.5 px-2.5 rounded-lg hover:bg-[#F8F1E7] border border-transparent hover:border-[#D6B978]/30"
           >
             <span>Live Storefront</span>
             <svg
-              className="w-3.5 h-3.5"
+              className="w-3.5 h-3.5 text-[#B58A45]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -89,10 +117,10 @@ export default function AdminHeader({ adminEmail, adminName, role = 'admin' }: A
 
           {/* Admin Identity */}
           <div className="text-right hidden sm:block">
-            <p className="text-xs font-medium text-[#F8F1E7]">
+            <p className="text-xs font-medium text-[#2B211C]">
               {adminName || 'System Admin'}
             </p>
-            <p className="text-[11px] text-[#A68A78] truncate max-w-[200px]">
+            <p className="text-[11px] text-[#7A5A45] truncate max-w-[200px]">
               {adminEmail || 'admin@pntcollections.com'}
             </p>
           </div>
@@ -101,12 +129,12 @@ export default function AdminHeader({ adminEmail, adminName, role = 'admin' }: A
           <button
             onClick={handleSignOut}
             disabled={isSigningOut}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#E8D8C8] bg-[#2B211C] hover:bg-[#3D2F28] border border-[#4A3B32] hover:border-amber-500/40 rounded transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#641C24] bg-[#F8F1E7] hover:bg-[#EFE2D0] border border-[#D6B978]/50 hover:border-[#B58A45] rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xs cursor-pointer"
           >
             {isSigningOut ? (
               <>
                 <svg
-                  className="animate-spin -ml-0.5 mr-1.5 h-3.5 w-3.5 text-amber-300"
+                  className="animate-spin -ml-0.5 mr-1.5 h-3.5 w-3.5 text-[#641C24]"
                   fill="none"
                   viewBox="0 0 24 24"
                 >
@@ -129,7 +157,7 @@ export default function AdminHeader({ adminEmail, adminName, role = 'admin' }: A
             ) : (
               <>
                 <svg
-                  className="w-3.5 h-3.5 text-[#A68A78]"
+                  className="w-3.5 h-3.5 text-[#B58A45]"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"

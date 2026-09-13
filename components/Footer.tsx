@@ -34,7 +34,7 @@ export default function Footer() {
           <div>
             <Image
               src={assets.images.logoFooter}
-              alt="PNT Collections Logo"
+              alt="PNT Creation Logo"
               width={180}
               height={120}
               className="h-auto w-[155px]"
@@ -62,7 +62,7 @@ export default function Footer() {
         {/* Divider & Copyright */}
         <div className="mt-10 border-t border-[#D6B978]/30 pt-6">
           <p className="text-sm text-[#F8F1E7]/60">
-            © 2026 PNT Collections. All rights reserved.
+            © 2026 PNT Creation. All rights reserved.
           </p>
         </div>
       </div>

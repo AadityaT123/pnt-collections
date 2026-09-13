@@ -3,8 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import AdminHeader from '@/components/admin/AdminHeader'
 
 export const metadata = {
-  title: 'Admin Console | PNT Collections',
-  description: 'PNT Collections internal administration and catalog console.',
+  title: 'Admin Console | PNT Creation',
+  description: 'PNT Creation internal administration and catalog console.',
   robots: {
     index: false,
     follow: false,
@@ -49,7 +49,7 @@ export default async function AdminDashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#140F0D] text-[#F8F1E7] flex flex-col font-sans">
+    <div className="min-h-screen bg-[#F8F1E7] text-[#2B211C] flex flex-col font-sans selection:bg-[#B58A45]/20 selection:text-[#2B211C]">
       <AdminHeader
         adminEmail={user.email}
         adminName={profile.full_name}

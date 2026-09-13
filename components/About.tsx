@@ -7,7 +7,7 @@ export default function About() {
       <div className="mx-auto max-w-3xl">
         {/* Eyebrow */}
         <p className="mb-4 text-sm uppercase tracking-[0.3em] text-[#D6B978]">
-          Welcome to PNT Collections
+          Welcome to PNT Creation
         </p>
 
         {/* Heading */}
