@@ -29,6 +29,15 @@ interface ProductListProps {
   initialProducts: ProductListItem[]
 }
 
+function resolveImageUrl(path: string | null): string | null {
+  if (!path) return null
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('/')) {
+    return path
+  }
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  return `${supabaseUrl}/storage/v1/object/public/product-images/${path}`
+}
+
 export default function ProductList({ initialProducts }: ProductListProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -255,7 +264,7 @@ export default function ProductList({ initialProducts }: ProductListProps) {
                           <div className="relative w-10 h-12 rounded bg-[#F8F1E7] border border-[#D6B978]/40 overflow-hidden shrink-0 flex items-center justify-center">
                             {product.primaryImageUrl ? (
                               <Image
-                                src={product.primaryImageUrl}
+                                src={resolveImageUrl(product.primaryImageUrl)!}
                                 alt={product.name}
                                 fill
                                 sizes="40px"

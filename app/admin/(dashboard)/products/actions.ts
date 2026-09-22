@@ -157,7 +157,7 @@ export async function createProductAction(input: ProductInput): Promise<ActionRe
       return { error: prodErr?.message || 'Failed to create product.' }
     }
 
-    // 4. Insert default variant with stock_on_hand = 0
+    // 4. Insert default variant (stock_on_hand defaults to 0 in schema)
     const { data: newVariant, error: varErr } = await supabase
       .from('product_variants')
       .insert({
@@ -166,7 +166,6 @@ export async function createProductAction(input: ProductInput): Promise<ActionRe
         title: 'Default',
         price_paise,
         compare_at_price_paise,
-        stock_on_hand: 0,
         status: 'active',
       })
       .select('id')
