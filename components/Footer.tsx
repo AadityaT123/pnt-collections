@@ -1,23 +1,24 @@
 import Image from "next/image";
+import Link from "next/link";
 
 import { assets } from "@/lib/assets";
 
 const footerLinks = [
   {
     label: "Sarees",
-    href: "#sarees",
+    href: "/products",
   },
   {
     label: "Collections",
-    href: "#collections",
+    href: "/products",
   },
   {
     label: "About",
-    href: "#about",
+    href: "/about",
   },
   {
     label: "Contact",
-    href: "#contact",
+    href: "/contact",
   },
 ];
 
@@ -48,13 +49,13 @@ export default function Footer() {
           {/* Navigation */}
           <nav className="flex flex-wrap gap-x-8 gap-y-3 pt-6 text-sm md:pt-8">
             {footerLinks.map((link) => (
-              <a
+              <Link
                 key={link.label}
                 href={link.href}
                 className="transition-colors hover:text-[#D6B978]"
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
           </nav>
         </div>

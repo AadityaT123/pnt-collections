@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 import { assets } from "@/lib/assets";
 
@@ -14,7 +15,7 @@ export default function Header() {
       <header className="border-b border-[#D6B978]/40 bg-[#F8F1E7]">
         <div className="mx-auto flex h-[92px] max-w-7xl items-center justify-between px-6 lg:px-10">
           {/* Logo */}
-          <a href="#" className="flex items-center">
+          <Link href="/" className="flex items-center">
             <Image
               src={assets.images.logo}
               alt="PNT Creation Logo"
@@ -23,51 +24,44 @@ export default function Header() {
               priority
               className="h-auto w-[105px]"
             />
-          </a>
+          </Link>
 
           {/* Navigation */}
           <nav className="hidden items-center gap-7 md:flex">
-            <a
-              href="#"
+            <Link
+              href="/"
               className="text-sm transition-colors hover:text-[#641C24]"
             >
               Home
-            </a>
+            </Link>
 
-            <a
-              href="#sarees"
+            <Link
+              href="/products"
               className="text-sm transition-colors hover:text-[#641C24]"
             >
               Sarees
-            </a>
+            </Link>
 
-            <a
-              href="#new-arrivals"
-              className="text-sm transition-colors hover:text-[#641C24]"
-            >
-              New Arrivals
-            </a>
-
-            <a
-              href="#collections"
+            <Link
+              href="/products"
               className="text-sm transition-colors hover:text-[#641C24]"
             >
               Collections
-            </a>
+            </Link>
 
-            <a
-              href="#about"
+            <Link
+              href="/about"
               className="text-sm transition-colors hover:text-[#641C24]"
             >
               About
-            </a>
+            </Link>
 
-            <a
-              href="#contact"
+            <Link
+              href="/contact"
               className="text-sm transition-colors hover:text-[#641C24]"
             >
               Contact
-            </a>
+            </Link>
           </nav>
 
           {/* Header Actions */}

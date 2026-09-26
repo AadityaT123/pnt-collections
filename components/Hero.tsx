@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 import { assets } from "@/lib/assets";
 
@@ -36,12 +37,12 @@ export default function Hero() {
               Discover sarees that make every occasion special.
             </p>
 
-            <a
-              href="#sarees"
+            <Link
+              href="/products"
               className="mt-9 inline-block bg-[#641C24] px-8 py-4 text-sm font-medium uppercase tracking-wider text-white transition hover:bg-[#4A141B]"
             >
               Shop Sarees →
-            </a>
+            </Link>
           </div>
         </div>
       </div>

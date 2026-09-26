@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 import { assets } from "@/lib/assets";
 
@@ -44,9 +45,9 @@ export default function Collections() {
         {/* Collection Images */}
         <div className="mt-10 grid gap-3 md:grid-cols-4">
           {collections.map((collection) => (
-            <a
+            <Link
               key={collection.title}
-              href="#sarees"
+              href="/products"
               className="group relative block overflow-hidden"
             >
               <Image
@@ -57,7 +58,7 @@ export default function Collections() {
                 sizes="(min-width: 768px) 25vw, 100vw"
                 className="h-auto w-full object-cover transition duration-500 group-hover:scale-105"
               />
-            </a>
+            </Link>
           ))}
         </div>
       </div>
