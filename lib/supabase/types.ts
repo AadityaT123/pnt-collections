@@ -278,6 +278,7 @@ export interface Database {
           weave: string | null
           color: string | null
           occasion: string | null
+          pattern: string | null
           saree_length_cm: number | null
           blouse_piece_included: boolean
           blouse_piece_length_cm: number | null
@@ -303,6 +304,7 @@ export interface Database {
           weave?: string | null
           color?: string | null
           occasion?: string | null
+          pattern?: string | null
           saree_length_cm?: number | null
           blouse_piece_included?: boolean
           blouse_piece_length_cm?: number | null
@@ -328,6 +330,7 @@ export interface Database {
           weave?: string | null
           color?: string | null
           occasion?: string | null
+          pattern?: string | null
           saree_length_cm?: number | null
           blouse_piece_included?: boolean
           blouse_piece_length_cm?: number | null
@@ -631,6 +634,75 @@ export interface Database {
         }
         Relationships: []
       }
+      catalog_attributes: {
+        Row: {
+          id: string
+          type: string
+          name: string
+          slug: string
+          metadata: Json
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          type: string
+          name: string
+          slug: string
+          metadata?: Json
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          type?: string
+          name?: string
+          slug?: string
+          metadata?: Json
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      product_attribute_values: {
+        Row: {
+          id: string
+          product_id: string
+          attribute_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          attribute_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          attribute_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'product_attribute_values_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'product_attribute_values_attribute_id_fkey'
+            columns: ['attribute_id']
+            isOneToOne: false
+            referencedRelation: 'catalog_attributes'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: {
       catalog_product_variants: {
@@ -676,3 +748,7 @@ export interface Database {
     }
   }
 }
+
+export type CatalogAttribute = Database['public']['Tables']['catalog_attributes']['Row']
+export type ProductAttributeValue = Database['public']['Tables']['product_attribute_values']['Row']
+

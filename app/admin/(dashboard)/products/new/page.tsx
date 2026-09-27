@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import ProductForm from '@/components/admin/ProductForm'
+import { getCatalogAttributes } from '@/lib/supabase/storefront'
 
 export const metadata = {
   title: 'New Product | PNT Creation Admin',
@@ -23,11 +24,15 @@ export default async function NewProductPage() {
     .neq('status', 'archived')
     .order('name', { ascending: true })
 
+  // Fetch attributes foundation (colors, fabrics, occasions, patterns)
+  const initialAttributes = await getCatalogAttributes()
+
   return (
     <ProductForm
       mode="create"
       categories={categories || []}
       collections={collections || []}
+      initialAttributes={initialAttributes}
     />
   )
 }

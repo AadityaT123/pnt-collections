@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useTransition } from 'react'
+import { useState, useRef, useTransition, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -8,8 +8,10 @@ import {
   createProductAction,
   updateProductAction,
   archiveProductAction,
+  createCatalogAttributeAction,
   type ProductInput,
 } from '@/app/admin/(dashboard)/products/actions'
+import type { CatalogAttributeOption } from '@/lib/supabase/storefront'
 
 interface TaxonomyOption {
   id: string
@@ -40,6 +42,11 @@ export interface ProductFormData {
   weave?: string
   color?: string
   occasion?: string
+  pattern?: string
+  colors?: string[]
+  fabrics?: string[]
+  occasions?: string[]
+  patterns?: string[]
   saree_length_cm?: number | null
   blouse_piece_included: boolean
   blouse_piece_length_cm?: number | null
@@ -48,6 +55,8 @@ export interface ProductFormData {
   gst_rate?: number | null
   category_id?: string | null
   collection_id?: string | null
+  seo_title?: string
+  seo_description?: string
   images: ImageItem[]
 }
 
@@ -56,6 +65,7 @@ interface ProductFormProps {
   initialData?: ProductFormData
   categories: TaxonomyOption[]
   collections: TaxonomyOption[]
+  initialAttributes?: CatalogAttributeOption[]
 }
 
 function slugify(text: string): string {
@@ -72,6 +82,7 @@ export default function ProductForm({
   initialData,
   categories,
   collections,
+  initialAttributes = [],
 }: ProductFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -93,11 +104,47 @@ export default function ProductForm({
   const [status, setStatus] = useState<'draft' | 'active' | 'archived'>(initialData?.status || 'draft')
   const [isFeatured, setIsFeatured] = useState(initialData?.is_featured || false)
 
-  // Saree Specs
-  const [fabric, setFabric] = useState(initialData?.fabric || '')
+  // Saree Specs: Dynamic Attributes (Color, Fabric, Occasion, Pattern)
+  const [attributePool, setAttributePool] = useState<CatalogAttributeOption[]>(initialAttributes)
+
+  // Colors (multi-select + add)
+  const initialColors = useMemo(() => {
+    if (initialData?.colors && initialData.colors.length > 0) return initialData.colors
+    if (initialData?.color) return initialData.color.split(',').map((c) => c.trim()).filter(Boolean)
+    return []
+  }, [initialData])
+  const [selectedColors, setSelectedColors] = useState<string[]>(initialColors)
+  const [newColorInput, setNewColorInput] = useState('')
+
+  // Fabrics (multi-select + add)
+  const initialFabrics = useMemo(() => {
+    if (initialData?.fabrics && initialData.fabrics.length > 0) return initialData.fabrics
+    if (initialData?.fabric) return initialData.fabric.split(',').map((f) => f.trim()).filter(Boolean)
+    return []
+  }, [initialData])
+  const [selectedFabrics, setSelectedFabrics] = useState<string[]>(initialFabrics)
+  const [newFabricInput, setNewFabricInput] = useState('')
+
+  // Occasions (multi-select + add)
+  const initialOccasions = useMemo(() => {
+    if (initialData?.occasions && initialData.occasions.length > 0) return initialData.occasions
+    if (initialData?.occasion) return initialData.occasion.split(',').map((o) => o.trim()).filter(Boolean)
+    return []
+  }, [initialData])
+  const [selectedOccasions, setSelectedOccasions] = useState<string[]>(initialOccasions)
+  const [newOccasionInput, setNewOccasionInput] = useState('')
+
+  // Patterns (multi-select + add)
+  const initialPatterns = useMemo(() => {
+    if (initialData?.patterns && initialData.patterns.length > 0) return initialData.patterns
+    if (initialData?.pattern) return initialData.pattern.split(',').map((p) => p.trim()).filter(Boolean)
+    return []
+  }, [initialData])
+  const [selectedPatterns, setSelectedPatterns] = useState<string[]>(initialPatterns)
+  const [newPatternInput, setNewPatternInput] = useState('')
+
+  // Additional Specs
   const [weave, setWeave] = useState(initialData?.weave || '')
-  const [color, setColor] = useState(initialData?.color || '')
-  const [occasion, setOccasion] = useState(initialData?.occasion || '')
   const [sareeLengthCm, setSareeLengthCm] = useState<string>(
     initialData?.saree_length_cm ? String(initialData.saree_length_cm) : '550'
   )
@@ -115,6 +162,10 @@ export default function ProductForm({
       : '5.0'
   )
 
+  // SEO Fields
+  const [seoTitle, setSeoTitle] = useState(initialData?.seo_title || '')
+  const [seoDescription, setSeoDescription] = useState(initialData?.seo_description || '')
+
   // Taxonomy
   const [categoryId, setCategoryId] = useState<string>(initialData?.category_id || '')
   const [collectionId, setCollectionId] = useState<string>(initialData?.collection_id || '')
@@ -129,6 +180,125 @@ export default function ProductForm({
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [showManualAdd, setShowManualAdd] = useState(false)
+
+  // Available attributes by type
+  const availableColors = useMemo(
+    () => attributePool.filter((a) => a.type === 'color'),
+    [attributePool]
+  )
+  const availableFabrics = useMemo(
+    () => attributePool.filter((a) => a.type === 'fabric'),
+    [attributePool]
+  )
+  const availableOccasions = useMemo(
+    () => attributePool.filter((a) => a.type === 'occasion'),
+    [attributePool]
+  )
+  const availablePatterns = useMemo(
+    () => attributePool.filter((a) => a.type === 'pattern'),
+    [attributePool]
+  )
+
+  // Dynamic attribute helpers
+  function toggleColor(name: string) {
+    setSelectedColors((prev) =>
+      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]
+    )
+  }
+
+  async function handleAddColor() {
+    const val = newColorInput.trim()
+    if (!val) return
+    if (!selectedColors.includes(val)) {
+      setSelectedColors((prev) => [...prev, val])
+    }
+    if (!availableColors.some((c) => c.name.toLowerCase() === val.toLowerCase())) {
+      const newOption: CatalogAttributeOption = {
+        id: `color-${slugify(val)}`,
+        type: 'color',
+        name: val,
+        slug: slugify(val),
+      }
+      setAttributePool((prev) => [...prev, newOption])
+      createCatalogAttributeAction('color', val).catch(() => {})
+    }
+    setNewColorInput('')
+  }
+
+  function toggleFabric(name: string) {
+    setSelectedFabrics((prev) =>
+      prev.includes(name) ? prev.filter((f) => f !== name) : [...prev, name]
+    )
+  }
+
+  async function handleAddFabric() {
+    const val = newFabricInput.trim()
+    if (!val) return
+    if (!selectedFabrics.includes(val)) {
+      setSelectedFabrics((prev) => [...prev, val])
+    }
+    if (!availableFabrics.some((f) => f.name.toLowerCase() === val.toLowerCase())) {
+      const newOption: CatalogAttributeOption = {
+        id: `fabric-${slugify(val)}`,
+        type: 'fabric',
+        name: val,
+        slug: slugify(val),
+      }
+      setAttributePool((prev) => [...prev, newOption])
+      createCatalogAttributeAction('fabric', val).catch(() => {})
+    }
+    setNewFabricInput('')
+  }
+
+  function toggleOccasion(name: string) {
+    setSelectedOccasions((prev) =>
+      prev.includes(name) ? prev.filter((o) => o !== name) : [...prev, name]
+    )
+  }
+
+  async function handleAddOccasion() {
+    const val = newOccasionInput.trim()
+    if (!val) return
+    if (!selectedOccasions.includes(val)) {
+      setSelectedOccasions((prev) => [...prev, val])
+    }
+    if (!availableOccasions.some((o) => o.name.toLowerCase() === val.toLowerCase())) {
+      const newOption: CatalogAttributeOption = {
+        id: `occasion-${slugify(val)}`,
+        type: 'occasion',
+        name: val,
+        slug: slugify(val),
+      }
+      setAttributePool((prev) => [...prev, newOption])
+      createCatalogAttributeAction('occasion', val).catch(() => {})
+    }
+    setNewOccasionInput('')
+  }
+
+  function togglePattern(name: string) {
+    setSelectedPatterns((prev) =>
+      prev.includes(name) ? prev.filter((p) => p !== name) : [...prev, name]
+    )
+  }
+
+  async function handleAddPattern() {
+    const val = newPatternInput.trim()
+    if (!val) return
+    if (!selectedPatterns.includes(val)) {
+      setSelectedPatterns((prev) => [...prev, val])
+    }
+    if (!availablePatterns.some((p) => p.name.toLowerCase() === val.toLowerCase())) {
+      const newOption: CatalogAttributeOption = {
+        id: `pattern-${slugify(val)}`,
+        type: 'pattern',
+        name: val,
+        slug: slugify(val),
+      }
+      setAttributePool((prev) => [...prev, newOption])
+      createCatalogAttributeAction('pattern', val).catch(() => {})
+    }
+    setNewPatternInput('')
+  }
 
   // Handle Title changes
   function handleTitleChange(val: string) {
@@ -168,7 +338,6 @@ export default function ProductForm({
           )
         }
 
-        // Generate unique, collision-free storage path: products/<timestamp>_<random>_<clean_filename>
         const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
         const storagePath = `products/${Date.now()}_${Math.random().toString(36).substring(2, 7)}_${cleanFileName}`
 
@@ -183,7 +352,6 @@ export default function ProductForm({
           throw new Error(`Upload failed for "${file.name}": ${uploadErr.message}`)
         }
 
-        // Retrieve public URL for display
         const {
           data: { publicUrl },
         } = supabase.storage.from('product-images').getPublicUrl(storagePath)
@@ -229,7 +397,6 @@ export default function ProductForm({
     setImages(images.map((img, i) => (i === index ? { ...img, alt_text: alt } : img)))
   }
 
-  // Add an image path manually
   function handleAddImage() {
     const path = newImagePath.trim()
     if (!path) return
@@ -262,52 +429,70 @@ export default function ProductForm({
     setImages(remaining.map((img, i) => ({ ...img, sort_order: i })))
   }
 
-  // Submit Handler
+  // Submit Handler with strict validation rules
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setServerError(null)
 
-    // Validation
+    // 1. Mandatory: Product Name
     const cleanName = name.trim()
     if (!cleanName) {
-      setServerError('Product title is required.')
+      setServerError('Product name is required.')
       return
     }
 
+    // 2. Mandatory: Slug
     const cleanSlug = slug.trim().toLowerCase()
     if (!cleanSlug) {
       setServerError('Product slug is required.')
       return
     }
 
+    // 3. Mandatory: SKU
     const cleanSku = sku.trim().toUpperCase()
     if (!cleanSku) {
-      setServerError('SKU is required.')
+      setServerError('SKU code is required.')
       return
     }
 
+    // 4. Mandatory: Category
+    if (!categoryId || !categoryId.trim()) {
+      setServerError('Please select a Primary Category for this product.')
+      return
+    }
+
+    // 5. Mandatory: Selling Price (>= 0)
     const numPrice = parseFloat(price)
     if (isNaN(numPrice) || numPrice < 0) {
-      setServerError('Valid regular price is required.')
+      setServerError('Selling price must be a valid non-negative number.')
       return
     }
 
+    // Optional: Compare-at Price
     let numComparePrice: number | null = null
     if (compareAtPrice && compareAtPrice.trim()) {
       numComparePrice = parseFloat(compareAtPrice)
       if (isNaN(numComparePrice) || numComparePrice < 0) {
-        setServerError('Sale price must be a valid number.')
+        setServerError('Sale / original price must be a valid non-negative number.')
         return
       }
       if (numComparePrice < numPrice) {
-        setServerError('Sale / compare-at price must be greater than or equal to regular price.')
+        setServerError('Sale / compare-at price must be greater than or equal to regular selling price.')
         return
       }
     }
 
+    // 6. Mandatory: Stock Quantity (>= 0)
     const numStock = parseInt(stock, 10)
     if (isNaN(numStock) || numStock < 0) {
-      setServerError('Stock quantity must be a non-negative integer.')
+      setServerError('Stock on hand must be a non-negative integer.')
+      return
+    }
+
+    // 7. Mandatory: At least one product image
+    const validImages = images.filter((img) => img.storage_path && img.storage_path.trim().length > 0)
+    if (validImages.length === 0) {
+      setServerError('At least one product image is required.')
       return
     }
 
@@ -330,19 +515,26 @@ export default function ProductForm({
       stock: numStock,
       status,
       is_featured: isFeatured,
-      fabric: fabric.trim() || undefined,
+      fabric: selectedFabrics.join(', ') || undefined,
       weave: weave.trim() || undefined,
-      color: color.trim() || undefined,
-      occasion: occasion.trim() || undefined,
+      color: selectedColors.join(', ') || undefined,
+      occasion: selectedOccasions.join(', ') || undefined,
+      pattern: selectedPatterns.join(', ') || undefined,
+      colors: selectedColors,
+      fabrics: selectedFabrics,
+      occasions: selectedOccasions,
+      patterns: selectedPatterns,
       saree_length_cm: sareeLengthCm ? parseInt(sareeLengthCm, 10) : null,
       blouse_piece_included: blouseIncluded,
       blouse_piece_length_cm: blouseIncluded ? parseInt(blouseLengthCm, 10) : null,
       care_instructions: careInstructions.trim() || undefined,
       hsn_code: hsnCode.trim() || undefined,
       gst_rate: gstRate ? parseFloat(gstRate) : null,
-      category_id: categoryId || null,
+      category_id: categoryId,
       collection_id: collectionId || null,
-      images,
+      seo_title: seoTitle.trim() || undefined,
+      seo_description: seoDescription.trim() || undefined,
+      images: validImages,
     }
 
     startTransition(async () => {
@@ -389,7 +581,9 @@ export default function ProductForm({
               Products
             </Link>
             <span className="text-[#B58A45]">/</span>
-            <span className="text-[#2B211C] font-medium">{mode === 'create' ? 'New Product' : 'Edit Product'}</span>
+            <span className="text-[#2B211C] font-medium">
+              {mode === 'create' ? 'New Product' : 'Edit Product'}
+            </span>
           </div>
           <h1 className="text-2xl font-serif font-medium text-[#2B211C]">
             {mode === 'create' ? 'Create New Saree Product' : `Edit: ${name || 'Product'}`}
@@ -399,41 +593,54 @@ export default function ProductForm({
         <div className="flex items-center gap-2">
           <Link
             href="/admin/products"
-            className="px-4 py-2 rounded-lg text-xs font-medium text-[#7A5A45] hover:text-[#2B211C] bg-[#FFFFFF] hover:bg-[#EFE2D0] border border-[#D6B978]/60 transition-colors shadow-xs"
+            className="px-4 py-2 border border-[#D6B978]/60 text-xs font-medium text-[#2B211C] rounded-lg hover:bg-[#F8F1E7] transition-colors"
           >
             Cancel
           </Link>
           <button
             type="submit"
-            disabled={isPending}
-            className="px-5 py-2 rounded-lg text-xs font-semibold bg-[#641C24] hover:bg-[#4A141B] text-white shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            disabled={isPending || isUploading}
+            className="px-5 py-2 bg-[#641C24] hover:bg-[#4A141B] text-white text-xs font-medium uppercase tracking-wider rounded-lg transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
           >
-            {isPending && (
-              <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
+            {isPending ? (
+              <>
+                <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span>Saving...</span>
+              </>
+            ) : mode === 'create' ? (
+              'Publish Product'
+            ) : (
+              'Save Changes'
             )}
-            <span>{isPending ? 'Saving...' : mode === 'create' ? 'Publish Product' : 'Save Changes'}</span>
           </button>
         </div>
       </div>
 
-      {/* Error alert */}
+      {/* Global Error Banner */}
       {serverError && (
-        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-center justify-between">
-          <span>{serverError}</span>
-          <button type="button" onClick={() => setServerError(null)} className="text-red-600 font-bold ml-4">
+        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-sm">⚠</span>
+            <span>{serverError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setServerError(null)}
+            className="text-red-600 hover:text-red-900 font-bold cursor-pointer"
+          >
             ✕
           </button>
         </div>
       )}
 
-      {/* Grid Layout */}
+      {/* Main 2-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left 2 Columns: Core & Specifications */}
+        {/* Left 2 Columns: Core Product Information */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Card: Basic Information */}
+          {/* Card: Basic Details */}
           <div className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#D6B978]/40 shadow-xs space-y-4">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-[#B58A45]">
               Basic Information
@@ -450,8 +657,8 @@ export default function ProductForm({
                 required
                 value={name}
                 onChange={(e) => handleTitleChange(e.target.value)}
-                placeholder="e.g. Royal Cyan Banarasi Silk Saree"
-                className="w-full px-3.5 py-2.5 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-sm text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24]"
+                placeholder="e.g. Royal Cyan Pure Katan Silk Banarasi Saree"
+                className="w-full px-3.5 py-2 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-xs sm:text-sm text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24]"
               />
             </div>
 
@@ -464,13 +671,13 @@ export default function ProductForm({
                 <button
                   type="button"
                   onClick={() => setIsAutoSlug(!isAutoSlug)}
-                  className="text-[11px] text-[#7A5A45] hover:text-[#641C24]"
+                  className="text-[10px] text-[#B58A45] hover:text-[#641C24] underline cursor-pointer"
                 >
-                  {isAutoSlug ? 'Unlock manual edit' : 'Lock to title auto-generate'}
+                  {isAutoSlug ? 'Unlock manual slug edit' : 'Lock & auto-generate from title'}
                 </button>
               </div>
-              <div className="flex items-center bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg overflow-hidden focus-within:border-[#641C24]">
-                <span className="px-3 text-xs text-[#7A5A45] font-mono border-r border-[#D6B978]/40 bg-[#EFE2D0]/40">
+              <div className="flex items-center">
+                <span className="px-3 py-2 bg-[#EFE2D0] border border-r-0 border-[#D6B978]/60 rounded-l-lg text-[11px] text-[#7A5A45] font-mono select-none">
                   /products/
                 </span>
                 <input
@@ -478,12 +685,10 @@ export default function ProductForm({
                   type="text"
                   required
                   value={slug}
-                  onChange={(e) => {
-                    setSlug(e.target.value.toLowerCase())
-                    setIsAutoSlug(false)
-                  }}
-                  placeholder="royal-cyan-banarasi-silk-saree"
-                  className="w-full px-3 py-2 bg-transparent text-xs text-[#2B211C] font-mono placeholder-[#A68A78] focus:outline-none"
+                  disabled={isAutoSlug}
+                  onChange={(e) => setSlug(slugify(e.target.value))}
+                  placeholder="royal-cyan-pure-katan-silk-saree"
+                  className="w-full px-3 py-2 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-r-lg text-xs font-mono text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24] disabled:opacity-75"
                 />
               </div>
             </div>
@@ -491,7 +696,7 @@ export default function ProductForm({
             {/* Short Description */}
             <div>
               <label htmlFor="product-short-desc" className="block text-xs font-medium text-[#2B211C] mb-1.5">
-                Short Description / Highlight
+                Short Subtitle / Excerpt
               </label>
               <input
                 id="product-short-desc"
@@ -529,7 +734,7 @@ export default function ProductForm({
               {/* Regular Price */}
               <div>
                 <label htmlFor="product-price" className="block text-xs font-medium text-[#2B211C] mb-1.5">
-                  Regular Price (₹) <span className="text-red-600">*</span>
+                  Selling Price (₹) <span className="text-red-600">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7A5A45] text-xs font-medium">₹</span>
@@ -550,7 +755,7 @@ export default function ProductForm({
               {/* Sale / Compare Price */}
               <div>
                 <label htmlFor="product-compare-price" className="block text-xs font-medium text-[#2B211C] mb-1.5">
-                  Sale / Original Price (₹) <span className="text-[10px] text-[#7A5A45]">(Optional strike-through)</span>
+                  Compare-at / Original Price (₹) <span className="text-[10px] text-[#7A5A45]">(Optional strike-through)</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7A5A45] text-xs font-medium">₹</span>
@@ -606,63 +811,278 @@ export default function ProductForm({
             </div>
           </div>
 
-          {/* Card: Saree Specifications */}
-          <div className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#D6B978]/40 shadow-xs space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-[#B58A45]">
-              Saree Specifications
-            </h2>
+          {/* Card: Saree Attributes & Specifications */}
+          <div className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#D6B978]/40 shadow-xs space-y-5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-[#B58A45]">
+                Saree Attributes & Specifications
+              </h2>
+              <span className="text-[10px] text-[#7A5A45]">Select existing or add new</span>
+            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="spec-fabric" className="block text-xs font-medium text-[#2B211C] mb-1.5">Fabric</label>
-                <input
-                  id="spec-fabric"
-                  type="text"
-                  value={fabric}
-                  onChange={(e) => setFabric(e.target.value)}
-                  placeholder="Pure Silk, Georgette, Chanderi"
-                  className="w-full px-3 py-2 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-xs text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24]"
-                />
+            {/* 1. Color (multi-select + add) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-medium text-[#2B211C]">
+                  Color(s) <span className="text-[10px] text-[#7A5A45]">(Select one or multiple)</span>
+                </label>
+                {selectedColors.length > 0 && (
+                  <span className="text-[10px] text-[#B58A45] font-medium">
+                    {selectedColors.length} selected: {selectedColors.join(', ')}
+                  </span>
+                )}
               </div>
 
+              {/* Color pills */}
+              <div className="flex flex-wrap gap-1.5 p-2 bg-[#F8F1E7]/60 rounded-xl border border-[#D6B978]/40 max-h-32 overflow-y-auto">
+                {availableColors.map((c) => {
+                  const isSelected = selectedColors.includes(c.name)
+                  const hex = (c.metadata?.hex as string) || undefined
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => toggleColor(c.name)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#641C24] text-white border border-[#641C24]'
+                          : 'bg-white text-[#2B211C] border border-[#D6B978]/60 hover:border-[#641C24]'
+                      }`}
+                    >
+                      {hex && (
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-black/20"
+                          style={{ backgroundColor: hex }}
+                        />
+                      )}
+                      <span>{c.name}</span>
+                      {isSelected && <span className="text-[10px]">✕</span>}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Add custom color */}
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  value={newColorInput}
+                  onChange={(e) => setNewColorInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddColor()
+                    }
+                  }}
+                  placeholder="Add new color (e.g. Peacock Blue)..."
+                  className="flex-1 px-3 py-1.5 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-xs text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24]"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddColor}
+                  className="px-3 py-1.5 bg-[#EFE2D0] hover:bg-[#D6B978]/40 border border-[#D6B978]/60 rounded-lg text-xs font-medium text-[#2B211C] transition-colors cursor-pointer"
+                >
+                  + Add Color
+                </button>
+              </div>
+            </div>
+
+            {/* 2. Fabric (multi-select + add) */}
+            <div className="space-y-2 pt-2 border-t border-[#D6B978]/30">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-medium text-[#2B211C]">
+                  Fabric / Material <span className="text-[10px] text-[#7A5A45]">(Select one or multiple)</span>
+                </label>
+                {selectedFabrics.length > 0 && (
+                  <span className="text-[10px] text-[#B58A45] font-medium">
+                    {selectedFabrics.length} selected: {selectedFabrics.join(', ')}
+                  </span>
+                )}
+              </div>
+
+              {/* Fabric pills */}
+              <div className="flex flex-wrap gap-1.5 p-2 bg-[#F8F1E7]/60 rounded-xl border border-[#D6B978]/40 max-h-32 overflow-y-auto">
+                {availableFabrics.map((f) => {
+                  const isSelected = selectedFabrics.includes(f.name)
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => toggleFabric(f.name)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#641C24] text-white border border-[#641C24]'
+                          : 'bg-white text-[#2B211C] border border-[#D6B978]/60 hover:border-[#641C24]'
+                      }`}
+                    >
+                      <span>{f.name}</span>
+                      {isSelected && <span className="ml-1 text-[10px]">✕</span>}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Add custom fabric */}
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  value={newFabricInput}
+                  onChange={(e) => setNewFabricInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddFabric()
+                    }
+                  }}
+                  placeholder="Add new fabric (e.g. Mulberry Silk)..."
+                  className="flex-1 px-3 py-1.5 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-xs text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24]"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddFabric}
+                  className="px-3 py-1.5 bg-[#EFE2D0] hover:bg-[#D6B978]/40 border border-[#D6B978]/60 rounded-lg text-xs font-medium text-[#2B211C] transition-colors cursor-pointer"
+                >
+                  + Add Fabric
+                </button>
+              </div>
+            </div>
+
+            {/* 3. Occasion (multi-select + add) */}
+            <div className="space-y-2 pt-2 border-t border-[#D6B978]/30">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-medium text-[#2B211C]">
+                  Occasion <span className="text-[10px] text-[#7A5A45]">(Select one or multiple)</span>
+                </label>
+                {selectedOccasions.length > 0 && (
+                  <span className="text-[10px] text-[#B58A45] font-medium">
+                    {selectedOccasions.length} selected: {selectedOccasions.join(', ')}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 p-2 bg-[#F8F1E7]/60 rounded-xl border border-[#D6B978]/40 max-h-28 overflow-y-auto">
+                {availableOccasions.map((o) => {
+                  const isSelected = selectedOccasions.includes(o.name)
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => toggleOccasion(o.name)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#641C24] text-white border border-[#641C24]'
+                          : 'bg-white text-[#2B211C] border border-[#D6B978]/60 hover:border-[#641C24]'
+                      }`}
+                    >
+                      <span>{o.name}</span>
+                      {isSelected && <span className="ml-1 text-[10px]">✕</span>}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  value={newOccasionInput}
+                  onChange={(e) => setNewOccasionInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddOccasion()
+                    }
+                  }}
+                  placeholder="Add new occasion (e.g. Sangeet)..."
+                  className="flex-1 px-3 py-1.5 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-xs text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24]"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddOccasion}
+                  className="px-3 py-1.5 bg-[#EFE2D0] hover:bg-[#D6B978]/40 border border-[#D6B978]/60 rounded-lg text-xs font-medium text-[#2B211C] transition-colors cursor-pointer"
+                >
+                  + Add Occasion
+                </button>
+              </div>
+            </div>
+
+            {/* 4. Pattern (multi-select + add) */}
+            <div className="space-y-2 pt-2 border-t border-[#D6B978]/30">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-medium text-[#2B211C]">
+                  Pattern / Motifs <span className="text-[10px] text-[#7A5A45]">(Select one or multiple)</span>
+                </label>
+                {selectedPatterns.length > 0 && (
+                  <span className="text-[10px] text-[#B58A45] font-medium">
+                    {selectedPatterns.length} selected: {selectedPatterns.join(', ')}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 p-2 bg-[#F8F1E7]/60 rounded-xl border border-[#D6B978]/40 max-h-28 overflow-y-auto">
+                {availablePatterns.map((p) => {
+                  const isSelected = selectedPatterns.includes(p.name)
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => togglePattern(p.name)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#641C24] text-white border border-[#641C24]'
+                          : 'bg-white text-[#2B211C] border border-[#D6B978]/60 hover:border-[#641C24]'
+                      }`}
+                    >
+                      <span>{p.name}</span>
+                      {isSelected && <span className="ml-1 text-[10px]">✕</span>}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  value={newPatternInput}
+                  onChange={(e) => setNewPatternInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddPattern()
+                    }
+                  }}
+                  placeholder="Add new pattern (e.g. Peacock Motifs)..."
+                  className="flex-1 px-3 py-1.5 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-xs text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24]"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddPattern}
+                  className="px-3 py-1.5 bg-[#EFE2D0] hover:bg-[#D6B978]/40 border border-[#D6B978]/60 rounded-lg text-xs font-medium text-[#2B211C] transition-colors cursor-pointer"
+                >
+                  + Add Pattern
+                </button>
+              </div>
+            </div>
+
+            {/* Weave, Length, Blouse */}
+            <div className="pt-3 border-t border-[#D6B978]/30 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="spec-weave" className="block text-xs font-medium text-[#2B211C] mb-1.5">Weave</label>
+                <label htmlFor="spec-weave" className="block text-xs font-medium text-[#2B211C] mb-1.5">
+                  Weave Technique
+                </label>
                 <input
                   id="spec-weave"
                   type="text"
                   value={weave}
                   onChange={(e) => setWeave(e.target.value)}
-                  placeholder="Jacquard, Kanjeevaram, Zari"
+                  placeholder="Kanjeevaram Korvai, Jacquard, Kadwa"
                   className="w-full px-3 py-2 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-xs text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24]"
                 />
               </div>
 
               <div>
-                <label htmlFor="spec-color" className="block text-xs font-medium text-[#2B211C] mb-1.5">Color</label>
-                <input
-                  id="spec-color"
-                  type="text"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  placeholder="Teal, Deep Crimson, Emerald"
-                  className="w-full px-3 py-2 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-xs text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24]"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="spec-occasion" className="block text-xs font-medium text-[#2B211C] mb-1.5">Occasion</label>
-                <input
-                  id="spec-occasion"
-                  type="text"
-                  value={occasion}
-                  onChange={(e) => setOccasion(e.target.value)}
-                  placeholder="Wedding, Festive, Evening"
-                  className="w-full px-3 py-2 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-xs text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24]"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="spec-length" className="block text-xs font-medium text-[#2B211C] mb-1.5">Saree Length (cm)</label>
+                <label htmlFor="spec-length" className="block text-xs font-medium text-[#2B211C] mb-1.5">
+                  Saree Length (cm)
+                </label>
                 <input
                   id="spec-length"
                   type="number"
@@ -700,11 +1120,25 @@ export default function ProductForm({
                   </div>
                 )}
               </div>
-            </div>
 
-            <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="spec-hsn" className="block text-xs font-medium text-[#2B211C] mb-1.5">HSN Code</label>
+                <label htmlFor="spec-care" className="block text-xs font-medium text-[#2B211C] mb-1.5">
+                  Wash & Care Instructions
+                </label>
+                <input
+                  id="spec-care"
+                  type="text"
+                  value={careInstructions}
+                  onChange={(e) => setCareInstructions(e.target.value)}
+                  placeholder="Dry clean recommended. Wrap in muslin cloth."
+                  className="w-full px-3 py-2 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-xs text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24]"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="spec-hsn" className="block text-xs font-medium text-[#2B211C] mb-1.5">
+                  HSN Code
+                </label>
                 <input
                   id="spec-hsn"
                   type="text"
@@ -716,7 +1150,9 @@ export default function ProductForm({
               </div>
 
               <div>
-                <label htmlFor="spec-gst" className="block text-xs font-medium text-[#2B211C] mb-1.5">GST Rate (%)</label>
+                <label htmlFor="spec-gst" className="block text-xs font-medium text-[#2B211C] mb-1.5">
+                  GST Rate (%)
+                </label>
                 <input
                   id="spec-gst"
                   type="number"
@@ -728,22 +1164,48 @@ export default function ProductForm({
                 />
               </div>
             </div>
+          </div>
+
+          {/* Card: SEO & Metadata */}
+          <div className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#D6B978]/40 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-[#B58A45]">
+                Search Engine Optimization (SEO)
+              </h2>
+              <span className="text-[10px] text-[#7A5A45]">Optional metadata</span>
+            </div>
 
             <div>
-              <label htmlFor="spec-care" className="block text-xs font-medium text-[#2B211C] mb-1.5">Care Instructions</label>
+              <label htmlFor="seo-title" className="block text-xs font-medium text-[#2B211C] mb-1.5">
+                SEO Meta Title
+              </label>
               <input
-                id="spec-care"
+                id="seo-title"
                 type="text"
-                value={careInstructions}
-                onChange={(e) => setCareInstructions(e.target.value)}
-                placeholder="Dry clean only"
-                className="w-full px-3 py-2 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-xs text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24]"
+                value={seoTitle}
+                onChange={(e) => setSeoTitle(e.target.value)}
+                placeholder="Royal Cyan Banarasi Silk Saree — PNT Creation"
+                className="w-full px-3.5 py-2 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-xs text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24]"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="seo-desc" className="block text-xs font-medium text-[#2B211C] mb-1.5">
+                SEO Meta Description
+              </label>
+              <textarea
+                id="seo-desc"
+                rows={2}
+                value={seoDescription}
+                onChange={(e) => setSeoDescription(e.target.value)}
+                placeholder="Shop our authentic handcrafted pure silk Banarasi saree with opulent zari border. Free insured shipping across India."
+                className="w-full px-3.5 py-2 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-xs text-[#2B211C] placeholder-[#A68A78] focus:outline-none focus:border-[#641C24]"
               />
             </div>
           </div>
         </div>
 
-        {/* Right 1 Column: Status, Categorization & Images */}
+        {/* Right 1 Column: Status, Organization & Images */}
         <div className="space-y-6">
           {/* Card: Status & Visibility */}
           <div className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#D6B978]/40 shadow-xs space-y-4">
@@ -753,7 +1215,7 @@ export default function ProductForm({
 
             <div>
               <label htmlFor="product-status" className="block text-xs font-medium text-[#2B211C] mb-1.5">
-                Product Status
+                Product Status <span className="text-red-600">*</span>
               </label>
               <select
                 id="product-status"
@@ -778,7 +1240,7 @@ export default function ProductForm({
             </label>
           </div>
 
-          {/* Card: Organization */}
+          {/* Card: Organization (Category mandatory) */}
           <div className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#D6B978]/40 shadow-xs space-y-4">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-[#B58A45]">
               Organization
@@ -787,15 +1249,16 @@ export default function ProductForm({
             {/* Category */}
             <div>
               <label htmlFor="product-category" className="block text-xs font-medium text-[#2B211C] mb-1.5">
-                Primary Category
+                Primary Category <span className="text-red-600">*</span>
               </label>
               <select
                 id="product-category"
+                required
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
                 className="w-full px-3 py-2 bg-[#F8F1E7] border border-[#D6B978]/60 rounded-lg text-xs text-[#2B211C] focus:outline-none focus:border-[#641C24] cursor-pointer"
               >
-                <option value="">No category</option>
+                <option value="">Select a category...</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -807,7 +1270,7 @@ export default function ProductForm({
             {/* Collection */}
             <div>
               <label htmlFor="product-collection" className="block text-xs font-medium text-[#2B211C] mb-1.5">
-                Collection
+                Collection <span className="text-[10px] text-[#7A5A45]">(Optional)</span>
               </label>
               <select
                 id="product-collection"
@@ -825,11 +1288,11 @@ export default function ProductForm({
             </div>
           </div>
 
-          {/* Card: Product Images */}
+          {/* Card: Product Images (Mandatory: at least 1 image) */}
           <div className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#D6B978]/40 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-[#B58A45]">
-                Product Images
+                Product Images <span className="text-red-600">*</span>
               </h2>
               <span className="text-[10px] text-[#7A5A45] font-medium">
                 {images.length} added
@@ -936,7 +1399,7 @@ export default function ProductForm({
                     {/* Details & Alt Edit */}
                     <div className="flex-1 w-full space-y-1.5">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-mono text-[#7A5A45] truncate max-w-[200px]" title={img.storage_path}>
+                        <span className="text-[11px] font-mono text-[#7A5A45] truncate max-w-[180px]" title={img.storage_path}>
                           {img.storage_path.split('/').pop() || img.storage_path}
                         </span>
                         {img.is_primary ? (
