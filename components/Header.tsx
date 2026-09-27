@@ -43,7 +43,7 @@ export default function Header() {
             </Link>
 
             <Link
-              href="/products"
+              href="/collections"
               className="text-sm transition-colors hover:text-[#641C24]"
             >
               Collections

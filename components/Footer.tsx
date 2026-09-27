@@ -10,7 +10,7 @@ const footerLinks = [
   },
   {
     label: "Collections",
-    href: "/products",
+    href: "/collections",
   },
   {
     label: "About",

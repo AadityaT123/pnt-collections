@@ -19,6 +19,15 @@ export interface StorefrontProduct {
   primaryImageAlt: string
 }
 
+export interface StorefrontCollection {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  image_path: string | null
+  sort_order: number
+}
+
 /**
  * Format paise into Indian Rupee string (e.g. 34500 -> ₹345)
  */
@@ -28,15 +37,97 @@ export function formatINR(paise: number): string {
 }
 
 /**
+/**
+ * Fetch active collection metadata by slug (supporting both DB collections and curated themes).
+ */
+export async function getStorefrontCollectionBySlug(slug: string): Promise<{
+  name: string
+  description: string | null
+} | null> {
+  const manualThemes: Record<string, { name: string; description: string }> = {
+    festive: {
+      name: 'Festive Collection',
+      description: 'Radiant sarees designed for celebrations, pujas, and joyous family milestones.',
+    },
+    wedding: {
+      name: 'Wedding & Occasion',
+      description: 'Regal bridal weaves, pure zari craftsmanship, and majestic heirloom silhouettes.',
+    },
+    'new-arrivals': {
+      name: 'New Arrivals',
+      description: 'Freshly arrived sarees from master weavers across India’s premier heritage clusters.',
+    },
+    everyday: {
+      name: 'New Arrivals',
+      description: 'Freshly arrived sarees from master weavers across India’s premier heritage clusters.',
+    },
+    'best-sellers': {
+      name: 'Best Sellers',
+      description: 'Our most-beloved signature sarees, cherished by patrons for their timeless beauty.',
+    },
+  }
+
+  try {
+    const supabase = await createClient()
+    const { data: col } = await supabase
+      .from('collections')
+      .select('name, description')
+      .eq('slug', slug)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    if (col) {
+      return { name: col.name, description: col.description }
+    }
+
+    if (manualThemes[slug]) {
+      return manualThemes[slug]
+    }
+
+    return null
+  } catch (error) {
+    console.error('Error fetching collection by slug:', error)
+    return null
+  }
+}
+
+/**
  * Fetch all active storefront products with their images and active variant pricing/stock.
  * Uses the existing Supabase server client, products table, and catalog_product_variants view.
+ * When collectionSlug is provided, filters to products assigned via product_collections.
  */
-export async function getActiveStorefrontProducts(): Promise<StorefrontProduct[]> {
+export async function getActiveStorefrontProducts(collectionSlug?: string): Promise<StorefrontProduct[]> {
   try {
     const supabase = await createClient()
 
-    // 1. Fetch active products with associated images
-    const { data: products, error: prodError } = await supabase
+    let filteredProductIds: string[] | null = null
+
+    if (collectionSlug) {
+      // 1. Check if an active collection matches this slug
+      const { data: col } = await supabase
+        .from('collections')
+        .select('id')
+        .eq('slug', collectionSlug)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (col) {
+        // Query assigned products from product_collections
+        const { data: prodCols } = await supabase
+          .from('product_collections')
+          .select('product_id, sort_order')
+          .eq('collection_id', col.id)
+          .order('sort_order', { ascending: true })
+
+        filteredProductIds = (prodCols || []).map((pc) => pc.product_id)
+        if (filteredProductIds.length === 0) {
+          return []
+        }
+      }
+    }
+
+    // 2. Fetch active products with associated images
+    let productsQuery = supabase
       .from('products')
       .select(`
         id,
@@ -57,7 +148,14 @@ export async function getActiveStorefrontProducts(): Promise<StorefrontProduct[]
         )
       `)
       .eq('status', 'active')
-      .order('created_at', { ascending: false })
+
+    if (filteredProductIds !== null) {
+      productsQuery = productsQuery.in('id', filteredProductIds)
+    }
+
+    const { data: products, error: prodError } = await productsQuery.order('created_at', {
+      ascending: false,
+    })
 
     if (prodError || !products || products.length === 0) {
       if (prodError) {
@@ -147,3 +245,48 @@ export async function getActiveStorefrontProducts(): Promise<StorefrontProduct[]
     return []
   }
 }
+
+/**
+ * Fetch all active public collections ordered by sort_order and creation date.
+ */
+export async function getActiveStorefrontCollections(): Promise<StorefrontCollection[]> {
+  try {
+    const supabase = await createClient()
+
+    const { data: collections, error } = await supabase
+      .from('collections')
+      .select('id, name, slug, description, image_path, sort_order')
+      .eq('status', 'active')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false })
+
+    if (error || !collections) {
+      if (error) {
+        console.error('Error fetching storefront collections:', error)
+      }
+      return []
+    }
+
+    return collections.map((col) => {
+      let resolvedImagePath: string | null = col.image_path ? col.image_path.trim() : null
+      if (resolvedImagePath) {
+        if (
+          !resolvedImagePath.startsWith('http://') &&
+          !resolvedImagePath.startsWith('https://') &&
+          !resolvedImagePath.startsWith('/')
+        ) {
+          const { data } = supabase.storage.from('product-images').getPublicUrl(resolvedImagePath)
+          resolvedImagePath = data.publicUrl
+        }
+      }
+      return {
+        ...col,
+        image_path: resolvedImagePath,
+      }
+    })
+  } catch (error) {
+    console.error('Unexpected error in getActiveStorefrontCollections:', error)
+    return []
+  }
+}
+

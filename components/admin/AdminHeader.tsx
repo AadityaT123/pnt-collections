@@ -33,6 +33,7 @@ export default function AdminHeader({ adminEmail, adminName, role = 'admin' }: A
 
   const isDashboardActive = pathname === '/admin'
   const isProductsActive = pathname.startsWith('/admin/products')
+  const isCollectionsActive = pathname.startsWith('/admin/collections')
 
   return (
     <header className="sticky top-0 z-50 bg-[#FFFFFF] text-[#2B211C] border-b border-[#D6B978]/40 shadow-xs">
@@ -87,6 +88,16 @@ export default function AdminHeader({ adminEmail, adminName, role = 'admin' }: A
               }`}
             >
               Products
+            </Link>
+            <Link
+              href="/admin/collections"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                isCollectionsActive
+                  ? 'bg-[#641C24] text-white shadow-xs font-semibold'
+                  : 'text-[#7A5A45] hover:text-[#2B211C] hover:bg-[#F8F1E7]'
+              }`}
+            >
+              Collections
             </Link>
           </nav>
         </div>
